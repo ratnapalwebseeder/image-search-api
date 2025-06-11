@@ -1,0 +1,9 @@
+fastapi==0.115.12
+uvicorn==0.34.3
+pillow==11.2.1
+torch==2.7.1
+torchvision==0.22.1
+numpy==2.3.0
+sqlalchemy==2.0.41
+psycopg2-binary==2.9.10
+python-multipart==0.0.20
