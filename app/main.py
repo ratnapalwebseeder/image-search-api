@@ -2,12 +2,31 @@
 from fastapi import FastAPI, UploadFile, File, Depends, Request
 from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 from app import database, models, schemas, extractor, search_engine
 import numpy as np
 from PIL import Image
 import io
+import os
+import logging
+import sys
+from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 
-app = FastAPI()
+
+app = FastAPI(title="Image Search API",
+              description="API for searching similar images",
+              version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[os.getenv("ALLOWED_ORIGINS", "*")],  # In production, specify exact domains
+    allow_credentials=True,
+    allow_methods=["*"],  # In production, specify exact methods (GET, POST, etc.)
+    allow_headers=["*"],  # In production, specify exact headers
+)
+
 models.Base.metadata.create_all(bind=database.engine)
 
 def get_db():
@@ -17,26 +36,42 @@ def get_db():
     finally:
         db.close()
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger("image-search-api")
+
+# Then add logging to your routes
 @app.post("/add")
 async def add_image(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    contents = await file.read()
-    image = Image.open(io.BytesIO(contents)).convert("RGB")
-    vec = extractor.extract_vector(image).astype(np.float32)
+    try:
+        contents = await file.read()
+        image = Image.open(io.BytesIO(contents)).convert("RGB")
+        vec = extractor.extract_vector(image).astype(np.float32)
 
-    image_record = models.ImageVector(
-        name=file.filename,
-        vector=vec.tobytes(),
-        image_data=contents
-    )
-    db.add(image_record)
-    db.commit()
-    return {"message": "Image added successfully"}
+        image_record = models.ImageVector(
+            name=file.filename,
+            vector=vec.tobytes(),
+            image_data=contents
+        )
+        db.add(image_record)
+        db.commit()
+        logger.info(f"Added image: {file.filename}")
+        return {"message": "Image added successfully"}
+    except Exception as e:
+        logger.error(f"Error adding image: {str(e)}")
+        raise
 
 @app.post("/search", response_model=list[schemas.SearchResult])
 async def search_image(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    request: Request = None  # 👈 Add this
+    request: Request = None
 ):
     contents = await file.read()
     image = Image.open(io.BytesIO(contents)).convert("RGB")
