@@ -9,3 +9,5 @@ class ImageVector(Base):
     name = Column(String, unique=True)
     vector = Column(LargeBinary)
     image_data = Column(LargeBinary)
+    cad_file = Column(LargeBinary)
+    cad_name = Column(String)

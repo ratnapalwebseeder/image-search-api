@@ -4,7 +4,8 @@ from pydantic import BaseModel
 class SearchResult(BaseModel):
     name: str
     similarity: float
-    url: str
+    img_url: str
+    cad_url: str
 
 class ImageListItem(BaseModel):
     name: str

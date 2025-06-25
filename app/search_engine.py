@@ -1,4 +1,3 @@
-# app/search_engine.py
 import numpy as np
 from sqlalchemy.orm import Session
 from app import models
@@ -6,10 +5,11 @@ from app import models
 def search_similar_images(db: Session, query_vec: np.ndarray, top_k: int = 5):
     vectors = []
     names = []
+    
     for row in db.query(models.ImageVector).all():
         vec = np.frombuffer(row.vector, dtype=np.float32)
         vectors.append(vec)
-        names.append((row.name, row.image_data))
+        names.append((row.name, row.cad_name, row.image_data))  # Include cad_name
     
     vectors = np.vstack(vectors)
     similarities = np.dot(vectors, query_vec)
@@ -17,6 +17,11 @@ def search_similar_images(db: Session, query_vec: np.ndarray, top_k: int = 5):
 
     results = []
     for idx in top_indices:
-        name, data = names[idx]
-        results.append({"name": name, "similarity": float(similarities[idx]), "image_data": data})
+        name, cad_name, data = names[idx]  # Unpack cad_name
+        results.append({
+            "name": name,
+            "cad_name": cad_name,
+            "similarity": float(similarities[idx]),
+            "image_data": data
+        })
     return results
