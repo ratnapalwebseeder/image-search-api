@@ -23,4 +23,4 @@ app.add_middleware(BrotliMiddleware)
 # security = HTTPBearer()
 
 # can add modules having api calls below
-import search_images
+import api_search_images

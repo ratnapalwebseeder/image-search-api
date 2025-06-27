@@ -1,7 +1,9 @@
+import sys
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+# os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import logging
 from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
 from PIL import Image
 import numpy as np
 import faiss
@@ -11,21 +13,46 @@ from torchvision import transforms
 import io
 from main import app
 from threading import Lock
-from mongo_connect import get_cad_file
+from dotenv import load_dotenv
+from mongo_connect import get_cad_file, list_all
+
+# loading env file 
+load_dotenv("prod.env")
+
 # Disable PIL's decompression bomb protection
-Image.MAX_IMAGE_PIXELS = None
+Image.MAX_IMAGE_PIXELS = 200000000
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Define a formatter
+formatter = logging.Formatter(
+    '%(asctime)s - %(levelname)s - %(message)s'
+)
+
+# Create the main logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Stream handler (stdout)
+stream_handler = logging.StreamHandler(sys.stdout)
+stream_handler.setLevel(logging.INFO)
+stream_handler.setFormatter(formatter)
+
+# File handler for all logs
+file_handler = logging.FileHandler("image-search.log")
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+
+# Add handlers to logger
+logger.addHandler(stream_handler)
+logger.addHandler(file_handler)
 
 # Configuration
-INDEX_PATH = "faiss_index.bin"
-NAMES_PATH = "image_names.npy"
-DATA_DIR = "./uploaded_images"
+INDEX_PATH = os.getenv("INDEX_PATH", "faiss_index.bin")
+NAMES_PATH = os.getenv("NAMES_PATH", "image_names.npy")
+DATA_DIR = os.getenv("DATA_DIR", "./uploaded_images")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 TOP_K = 5  # Number of similar images to return
-IMAGE_ROOT_PATH = "/uploads"
+IMAGE_ROOT_PATH = os.getenv("IMAGE_ROOT_PATH", "./uploads")
 
 # Thread lock for FAISS index access
 index_lock = Lock()
@@ -52,7 +79,7 @@ model.avgpool.register_forward_hook(get_activation("avgpool"))
 
 # Global variables for FAISS index and image names
 index = faiss.read_index(INDEX_PATH)
-image_names = np.load(NAMES_PATH).tolist()
+image_names = np.load(NAMES_PATH, allow_pickle=True).tolist()
 logger.info(f"Loaded FAISS index with {len(image_names)} images")
 
 def extract_embedding(image: Image.Image) -> np.ndarray:
@@ -104,9 +131,16 @@ async def reload_index():
         with index_lock:
             global index, image_names
             index = faiss.read_index(INDEX_PATH)
-            image_names = np.load(NAMES_PATH).tolist()
+            image_names = np.load(NAMES_PATH, allow_pickle=True).tolist()
         logger.info(f"Reloaded FAISS index with {len(image_names)} images")
         return {"message": f"Index reloaded with {len(image_names)} images"}
     except Exception as e:
         logger.error(f"Error reloading index: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/list")
+async def list():
+    """List all images in the folder"""
+    data = list_all()
+    if data:
+        return JSONResponse(data)

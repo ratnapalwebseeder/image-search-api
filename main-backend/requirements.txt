@@ -1,4 +1,4 @@
-fastapi
+fastapi==0.115.13
 uvicorn==0.34.3
 pillow==11.2.1
 torch==2.7.1
@@ -8,7 +8,9 @@ sqlalchemy==2.0.41
 psycopg2-binary==2.9.10
 python-multipart==0.0.20
 python-magic==0.4.27
-brotli-asgi
-faiss-cpu
-watchdog
-pymongo
+brotli-asgi==1.4.0
+faiss-cpu==1.11.0
+watchdog==6.0.0
+pymongo==4.13.2
+retry==0.9.2
+python-dotenv==1.1.1
