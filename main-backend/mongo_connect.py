@@ -1,5 +1,6 @@
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from math import ceil
 import os
 
 # Load environment variables from .env file
@@ -22,19 +23,45 @@ def get_cad_file(image_path):
     else:
         return None
 
-def list_all():
-    documents = gallery_collection.find({}, {"_id": 0, "image": 1, "cadFile": 1, "imageName":1})
+def list_all(page: int = 1, limit: int = 10):
+    # Ensure page and limit are positive
+    page = max(1, page)
+    limit = max(1, limit)
+    
+    # Calculate skip value for pagination
+    skip = (page - 1) * limit
+    
+    # Get total number of documents
+    total = gallery_collection.count_documents({})
+    
+    # Fetch paginated documents
+    documents = gallery_collection.find(
+        {}, 
+        {"_id": 0, "image": 1, "cadFile": 1, "imageName": 1}
+    ).skip(skip).limit(limit)
+    
+    # Format the image data
     image_data = [
         {
             "name": doc["imageName"],
-            "image_url": doc["image"],
+            "url": doc["image"],
             "cad_url": doc["cadFile"]
         }
         for doc in documents
     ]
-    return image_data
+    
+    # Calculate total pages
+    total_pages = ceil(total / limit) if total > 0 else 1
+    
+    # Return paginated response
+    return {
+        "data": image_data,
+        "total": total,
+        "page": page,
+        "pages": total_pages
+    }
 
-print(list_all())
+# print(list_all())
 
 ### testing locally
 # image_path = "/uploads/A2.jpg"

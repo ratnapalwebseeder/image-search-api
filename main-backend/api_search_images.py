@@ -2,7 +2,7 @@ import sys
 import os
 # os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import logging
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import File, UploadFile, HTTPException, Query
 from fastapi.responses import JSONResponse
 from PIL import Image
 import numpy as np
@@ -139,8 +139,7 @@ async def reload_index():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/list")
-async def list():
-    """List all images in the folder"""
-    data = list_all()
-    if data:
-        return JSONResponse(data)
+async def list_images(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
+    """List all images in the folder with pagination"""
+    data = list_all(page=page, limit=limit)
+    return JSONResponse(data)
