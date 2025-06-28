@@ -1,0 +1,11 @@
+__pycache*
+.venv
+*.env
+.*pyc
+*.log
+populatedb.py
+uploaded_images
+software_data
+ghg*
+*.bin
+*npy

@@ -2,7 +2,7 @@ import sys
 import os
 # os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import logging
-from fastapi import File, UploadFile, HTTPException, Query
+from fastapi import File, UploadFile, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from PIL import Image
 import numpy as np
@@ -47,6 +47,7 @@ logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 
 # Configuration
+BASE_URL = os.getenv("BASE_URL", "")
 INDEX_PATH = os.getenv("INDEX_PATH", "faiss_index.bin")
 NAMES_PATH = os.getenv("NAMES_PATH", "image_names.npy")
 DATA_DIR = os.getenv("DATA_DIR", "./uploaded_images")
@@ -138,8 +139,22 @@ async def reload_index():
         logger.error(f"Error reloading index: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/list")
-async def list_images(page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100)):
+
+@app.get("/list", response_model=dict)
+async def list_images(
+    page: int = Query(1, ge=1, description="Page number, starting from 1"),
+    limit: int = Query(10, ge=1, le=100, description="Number of items per page, max 100"),
+    request: Request = None
+):
     """List all images in the folder with pagination"""
-    data = list_all(page=page, limit=limit)
-    return JSONResponse(data)
+    try:
+        # Use request.base_url if available, otherwise fall back to environment variable
+        effective_base_url = str(request.base_url) if request else BASE_URL
+        data = list_all(page=page, limit=limit, base_url=effective_base_url)
+        logger.info(f"Retrieved page {page} with limit {limit}, total items: {data['total']}")
+        return JSONResponse(content=data)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error in list_images endpoint: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

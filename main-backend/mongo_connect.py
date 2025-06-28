@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
 from dotenv import load_dotenv
 from math import ceil
 import os
@@ -11,10 +12,27 @@ mongodb_uri = os.getenv("MONGODB_URI")
 db_name = os.getenv("MONGODB_DB")
 collection_name = os.getenv("MONGODB_COLLECTION")
 
-# Connect to MongoDB
-client = MongoClient(mongodb_uri)
-db = client[db_name]
-gallery_collection = db[collection_name]
+# Validate environment variables
+if not all([mongodb_uri, db_name, collection_name]):
+    # logger.error("Missing required environment variables: MONGODB_URI, MONGODB_DB, or MONGODB_COLLECTION")
+    raise ValueError("Missing required environment variables")
+
+# Initialize MongoDB connection
+try:
+    client = MongoClient(
+        mongodb_uri,
+        serverSelectionTimeoutMS=5000,  # 5-second timeout for server selection
+        connectTimeoutMS=10000,         # 10-second timeout for connection
+        maxPoolSize=50                 # Connection pool size for scalability
+    )
+    # Test connection
+    client.admin.command("ping")
+    db = client[db_name]
+    gallery_collection = db[collection_name]
+    # logger.info("Successfully connected to MongoDB")
+except ConnectionFailure as e:
+    # logger.error(f"Failed to connect to MongoDB: {e}")
+    raise Exception("MongoDB connection failed")
 
 def get_cad_file(image_path):
     doc = gallery_collection.find_one({"image": image_path})
@@ -23,7 +41,7 @@ def get_cad_file(image_path):
     else:
         return None
 
-def list_all(page: int = 1, limit: int = 10):
+def list_all(base_url: str, page: int = 1, limit: int = 10):
     # Ensure page and limit are positive
     page = max(1, page)
     limit = max(1, limit)
@@ -39,21 +57,19 @@ def list_all(page: int = 1, limit: int = 10):
         {}, 
         {"_id": 0, "image": 1, "cadFile": 1, "imageName": 1}
     ).skip(skip).limit(limit)
+        
+    # Construct base URL if not provided (e.g., from Request)
+    effective_base_url = base_url.rstrip("/") if base_url else ""
     
-    # Format the image data
     image_data = [
         {
             "name": doc["imageName"],
-            "url": doc["image"],
-            "cad_url": doc["cadFile"]
+            "url": f"{effective_base_url}{doc['image']}" if effective_base_url else doc["image"],
+            "cad_url": f"{effective_base_url}{doc['cadFile']}" if effective_base_url else doc["cadFile"]
         }
         for doc in documents
     ]
-    
-    # Calculate total pages
     total_pages = ceil(total / limit) if total > 0 else 1
-    
-    # Return paginated response
     return {
         "data": image_data,
         "total": total,
