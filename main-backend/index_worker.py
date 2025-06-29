@@ -17,6 +17,8 @@ from retry import retry
 from pathlib import Path
 from dotenv import load_dotenv
 
+os.makedirs("worker_logs", exist_ok=True)
+os.makedirs("vector_db", exist_ok=True)
 # Define a formatter
 formatter = logging.Formatter(
     '%(asctime)s - %(levelname)s - %(message)s - [PID:%(process)d Thread:%(threadName)s]'
@@ -32,12 +34,12 @@ stream_handler.setLevel(logging.INFO)
 stream_handler.setFormatter(formatter)
 
 # File handler for all logs
-file_handler = logging.FileHandler("faiss_indexer.log")
+file_handler = logging.FileHandler("worker_logs/faiss_indexer.log")
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 
 # File handler for error logs only
-error_file_handler = logging.FileHandler("faiss_indexer_error.log")
+error_file_handler = logging.FileHandler("worker_logs/faiss_indexer_error.log")
 error_file_handler.setLevel(logging.ERROR)
 error_file_handler.setFormatter(formatter)
 

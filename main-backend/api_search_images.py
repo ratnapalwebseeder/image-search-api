@@ -3,7 +3,7 @@ import os
 # os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import logging
 from fastapi import File, UploadFile, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from PIL import Image
 import numpy as np
 import faiss
@@ -16,8 +16,11 @@ from threading import Lock
 from dotenv import load_dotenv
 from mongo_connect import get_cad_file, list_all
 
-# loading env file 
+# loading env file
 load_dotenv("prod.env")
+
+# Ensure the 'logs' directory exists
+os.makedirs("logs", exist_ok=True)
 
 # Disable PIL's decompression bomb protection
 Image.MAX_IMAGE_PIXELS = 200000000
@@ -38,7 +41,7 @@ stream_handler.setLevel(logging.INFO)
 stream_handler.setFormatter(formatter)
 
 # File handler for all logs
-file_handler = logging.FileHandler("image-search.log")
+file_handler = logging.FileHandler("logs/image-search.log")
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 
@@ -97,12 +100,38 @@ def extract_embedding(image: Image.Image) -> np.ndarray:
         logger.error(f"Error extracting embedding: {e}")
         raise HTTPException(status_code=500, detail="Error processing image")
 
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Backend Status</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f4; }
+                h1 { color: #2c3e50; }
+                a { text-decoration: none; color: white; background-color: #007BFF; padding: 10px 20px; border-radius: 5px; }
+                a:hover { background-color: #0056b3; }
+            </style>
+        </head>
+        <body>
+            <h1>🚀 Everything is working!</h1>
+            <p>Welcome to the Backend API</p>
+            <a href="/docs">Go to API Docs</a>
+        </body>
+    </html>
+    """
+    return html_content
+
 @app.post("/search")
-async def search_similar_images(file: UploadFile = File(...)):
+async def search_similar_images(file: UploadFile = File(...), request : Request = None):
     """Search for similar images given an input image."""
+    effective_url = str(request.base_url) if request else BASE_URL
+    # print(f"{effective_url=}")
     try:
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
+        # print(f"{file.filename=}")
         query_vec = extract_embedding(image)
         with index_lock:
             distances, indices = index.search(query_vec.reshape(1, -1), TOP_K)
@@ -115,11 +144,11 @@ async def search_similar_images(file: UploadFile = File(...)):
             image_info = {
                 "name": image_name,
                 "similarity": float(similarity_score),
-                "img_url":f"{IMAGE_ROOT_PATH}/{image_name}",
-                "cad_url": cad_file_path
+                "img_url":f"{effective_url}{image_name}",
+                "cad_url": f"{effective_url}{cad_file_path}"
             }
             similar_images.append(image_info)
-
+        logger.info(f"Searched for image file {file.filename}")
         return {"similar_images": similar_images}
     except Exception as e:
         logger.error(f"Error in search: {e}")

@@ -11,6 +11,7 @@ load_dotenv("prod.env")
 mongodb_uri = os.getenv("MONGODB_URI")
 db_name = os.getenv("MONGODB_DB")
 collection_name = os.getenv("MONGODB_COLLECTION")
+BASE_URL = os.getenv("BASE_URL")
 
 # Validate environment variables
 if not all([mongodb_uri, db_name, collection_name]):
@@ -77,7 +78,7 @@ def list_all(base_url: str, page: int = 1, limit: int = 10):
         "pages": total_pages
     }
 
-# print(list_all())
+# print(list_all(BASE_URL))
 
 ### testing locally
 # image_path = "/uploads/A2.jpg"
