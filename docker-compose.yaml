@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: ./main-backend
+      dockerfile: Dockerfile
+    ports:
+      - "10000:10000"
+    env_file:
+      - ./main-backend/prod.env
+    # depends_on:
+    #   - worker
+    volumes:
+      - ./main-backend/logs:/app/logs
+      - ./main-backend/vector_db:/app/vector_db
+
+  worker:
+    build:
+      context: ./main-backend
+      dockerfile: Dockerfile.worker
+    env_file:
+      - ./main-backend/prod.env
+    volumes:
+      - ./main-backend/worker_logs:/app/worker_logs
+      - ./main-backend/vector_db:/app/vector_db
+      - ./uploaded_images:/uploaded_images
